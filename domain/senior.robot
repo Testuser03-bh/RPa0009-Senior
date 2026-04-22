@@ -35,12 +35,10 @@ Open Senior Application
     Click    ${senior}
 Login Senior
     Wait For Element    ${user}    timeout=10
-    Move Mouse    ${user}
     Click    ${user}
     ${user}=        Evaluate        "${primary_config['Senior_User']}".split("_")[0].strip()
     RPA.Desktop.Type Text         ${user}
-    Wait For Element    ${password}    timeout=10
-    Move Mouse    ${password}
+    Wait For Element    ${password}    timeout=20
     Click    ${password}
     Evaluate                __import__('dotenv').load_dotenv(".env")
     ${pass}=    Get Environment Variable    PASSWORD
@@ -62,10 +60,12 @@ Validate Employee Data
         ${emp}=    Get Current Employee Data
         ${error_flag}=    Evaluate    $emp.get('error', '')
         IF    '${error_flag}' == 'csv_missing'
-            Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${responsible_list}    subject=${primary_config['Email_Subject_Error_01']}    body=${primary_config['Email_Body_Error_01']}
+            Log to console   EMAIL PART COMMENTED UNCOMMENT
+            # Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${responsible_list}    subject=${primary_config['Email_Subject_Error_01']}    body=${primary_config['Email_Body_Error_01']}
             BREAK
         ELSE IF    '${error_flag}' == 'already_processed'
-            Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${responsible_list}    subject=${primary_config['Email_Subject_Error_01']}    body=${primary_config['Email_Body_Error_04']}
+            Log to console   EMAIL PART COMMENTED UNCOMMENT RN
+            # Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${responsible_list}    subject=${primary_config['Email_Subject_Error_01']}    body=${primary_config['Email_Body_Error_04']}
             BREAK
         END
         IF    ${emp['found']} == False
@@ -97,7 +97,7 @@ Validate Employee Data
         Click    ${ok}
         ${report_generated}=    Run Keyword And Return Status    Wait For Element    ${result}    timeout=30
         IF    not ${report_generated}
-            Update Transaction Status    ${emp['registration']}    1    Error generating report in Senior
+            Update Transaction Status    ${emp['id_lines']}    1    Error generating report in Senior
             RPA.Desktop.Press Keys    enter
             Log To Console    Error caught for ${emp['registration']}, skipping...
             CONTINUE
@@ -124,22 +124,21 @@ Validate Employee Data
         ${active_smtp}=    Set Variable If    ${is_voith}    ${secondary_config['SMTP_Server']}    ${secondary_config['SMTP_Server_Out']}
         Authorize SMTP    account=${primary_config['Email_SenderAddress']}    password=${EMPTY}    smtp_server=${active_smtp}    smtp_port=${secondary_config['SMTP_Port']}
         ${email_body}=    Get File    ../data/body.html
-        ${email_status}=    Run Keyword And Return Status    Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${emp['email']}    subject=Ponto ${emp['month']}/${emp['year']}    body=${email_body}    html=True    attachments=${full_pdf_path}
-        IF    ${email_status}
-            Update Transaction Status    ${emp['registration']}    2    E-mail enviado com sucesso
-            ${final_folder}=    Set Variable    ${primary_config['FilePath']}\\${emp['package']}
-            Copy File    ${full_pdf_path}    ${final_folder}\\${pdf_filename}.pdf
-            Remove File  ${full_pdf_path}
-            Log To Console    File copied and removed from temp.
-        ELSE
-            Update Transaction Status    ${emp['registration']}    1    Error to send e-mail
-        END
+        # ${email_status}=    Run Keyword And Return Status    Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${emp['email']}    subject=Ponto ${emp['month']}/${emp['year']}    body=${email_body}    html=True    attachments=${full_pdf_path}
+        # IF    ${email_status}
+        #     Update Transaction Status    ${emp['id_lines']}    2    E-mail enviado com sucesso
+        #     ${final_folder}=    Set Variable    ${primary_config['FilePath']}\\${emp['package']}
+        #     Copy File    ${full_pdf_path}    ${final_folder}\\${pdf_filename}.pdf
+        #     Remove File  ${full_pdf_path}
+        #     Log To Console    File copied and removed from temp.
+        # ELSE
+        #     Update Transaction Status    ${emp['id_lines']}    1    Error to send e-mail
+        # END
+        Log to console  EMAIL PART COMMENTED UNCOMMENT
         Wait For Element    ${close_pdf}    timeout=10
         Click    ${close_pdf}
         Log To Console    Moving to next employee...
     END
-    # BUG 18 FIX: Soft Close Senior
-    # 1. Handle Model Closure
     ${model_visible}=    Run Keyword And Return Status    Wait For Element    ${close_model}    timeout=10
     IF    ${model_visible}
         Click    ${close_model}
@@ -148,12 +147,10 @@ Validate Employee Data
     ELSE
         Log To Console    Model window not detected, skipping Alt+F4 for model.
     END
-    # 2. Handle Senior Application Closure
     ${senior_visible}=    Run Keyword And Return Status    Wait For Element    ${close_senior}    timeout=10
     IF    ${senior_visible}
         Click    ${close_senior}
         RPA.Desktop.Press Keys    alt    f4
-        # Often Senior asks for a final confirmation (Step 10 in your docs)
         RPA.Desktop.Press Keys    enter
         Log To Console    Senior main window found and closed.
     ELSE
@@ -168,9 +165,15 @@ Send Email Final Report
     ${test_recipients}=    Split String    ${primary_config['Email_Responsible_Test']}    ;
     Authorize SMTP    account=${primary_config['Email_SenderAddress']}    password=${EMPTY}    smtp_server=${secondary_config['SMTP_Server']}    smtp_port=${secondary_config['SMTP_Port']}
     TRY
-        Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${test_recipients}    subject=${email_subject}    body=${body_msg}    html=True    attachments=${log_path}
-        Log To Console    📧 Report successfully sent with attached log!
-    EXCEPT
+        # Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${test_recipients}    subject=${email_subject}    body=${body_msg}    html=True    attachments=${log_path}
+        Log To Console    Report successfully sent with attached log!
+        Log to console  EMAIL PART COMMENTED UNCOMMENT
+    EXCEPT    AS    ${err_msg}
         Log To Console    Failed to send final report. Sending fallback error email.
-        Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${test_recipients}    subject=${primary_config['Email_Subject_Error_02']}    body=${primary_config['Email_Body_Error_03']} Process Failed
+        Log to console  EMAIL PART COMMENTED UNCOMMENT
+        # Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${test_recipients}    subject=${primary_config['Email_Subject_Error_02']} - RPA0009    body=${primary_config['Email_Body_Error_03']}<p>${err_msg}</p>    html=True
     END
+
+Clean up
+    Run keyword and ignore error  Run  taskkill /F /IM javaw.exe /T
+    Run keyword and ignore error  Run  taskkill /F /IM Senior.exe /T

@@ -37,13 +37,14 @@ def get_current_employee_data():
             os.remove(old_log_path)
             logger.console("[DB HELPER] Deleted old LogEventosSenior.csv")
         cursor.execute(
-            "SELECT TOP 1 Registration, Employee_Name, Company, Package, Start_Date, End_Date, Email FROM tb_RPA0009 WHERE Status = 0 ORDER BY ID_Lines ASC")
+            "SELECT TOP 1 ID_Lines, Registration, Employee_Name, Company, Package, Start_Date, End_Date, Email FROM tb_RPA0009 WHERE Status = 0 ORDER BY ID_Lines ASC")
         row = cursor.fetchone()
         if not row:
             cursor.execute("SELECT Value FROM tb_ProcessConfig WHERE Name = 'FileListName' AND ID_Process = 'RPA'")
             flist_param = cursor.fetchone()
             file_list_name = str(flist_param[0]).strip() if flist_param else "ListaFuncionarios.csv"
-            csv_path = os.path.join(base_filepath, file_list_name)
+            # csv_path = os.path.join(base_filepath, file_list_name)
+            csv_path = r"C:\TEMP\RPA0009\ListaFuncionarios.csv"
             if os.path.exists(csv_path):
                 logger.console("[DB HELPER] No DB records found. Reading CSV to populate database...")
                 with open(csv_path, mode='r', encoding='utf-8-sig') as f:
@@ -58,14 +59,21 @@ def get_current_employee_data():
                     if cursor.fetchone():
                         logger.error("[DB HELPER] Package already processed.")
                         return {"found": False, "error": "already_processed"}
-                    cursor.execute("SELECT Value FROM tb_ProcessConfig WHERE Name = 'MONTH' AND ID_Process = 'RPA'")
+                    month_key = f"{month_num:02d}"
+                    cursor.execute("SELECT Value FROM tb_ProcessConfig WHERE Name = ? AND ID_Process = 'RPA'", (month_key,))
+                    month_param = cursor.fetchone()
+                    month_val = str(month_param[0]) if month_param else "2625"
                     month_param = cursor.fetchone()
                     month_val = str(month_param[0]) if month_param else "2625"
                     day_start = month_val[0:2]
                     day_end = month_val[2:4]
-                    prev_month = 12 if month_num == 1 else month_num - 1
-                    db_start_date = f"{initial_year}-{prev_month:02d}-{day_start}"
-                    db_end_date = f"{year_num}-{month_num:02d}-{day_end}"
+                    parts = month_val.split(';')
+                    day_start   = parts[0].strip()   # e.g. "06"
+                    month_start = parts[1].strip()   # e.g. "04"
+                    day_end     = parts[2].strip()   # e.g. "05"
+                    month_end   = parts[3].strip()   # e.g. "05"
+                    db_start_date = f"{initial_year}-{month_start}-{day_start}"
+                    db_end_date   = f"{year_num}-{month_end}-{day_end}"
                     logger.console(f"[DB HELPER] Formatted SQL Dates - Start: {db_start_date}, End: {db_end_date}")
                     pkg_folder = os.path.join(base_filepath, package)
                     if not os.path.exists(pkg_folder):
@@ -91,25 +99,26 @@ def get_current_employee_data():
                     conn.commit()
                     logger.console("[DB HELPER] CSV data inserted into DB. Awaiting processing.")
                     cursor.execute(
-                        "SELECT TOP 1 Registration, Employee_Name, Company, Package, Start_Date, End_Date, Email FROM tb_RPA0009 WHERE Status = 0 ORDER BY ID_Lines ASC")
+                        "SELECT TOP 1 ID_Lines, Registration, Employee_Name, Company, Package, Start_Date, End_Date, Email FROM tb_RPA0009 WHERE Status = 0 ORDER BY ID_Lines ASC")
                     row = cursor.fetchone()
             else:
-                logger.error("[DB HELPER] CSV file not found at expected path.")
+                logger.error("[DB HELPER] CSV file not found at expected path. Path searched is" + csv_path)
                 return {"found": False, "error": "csv_missing"}
         if row:
-            clean_reg = str(row[0]).split('.')[0].strip()
-            name = str(row[1]).strip()
-            company = str(row[2]).strip()
-            email = str(row[6]).strip()
-            if not email:
+            id_lines  = str(row[0]).strip()
+            clean_reg = str(row[1]).split('.')[0].strip()
+            name      = str(row[2]).strip()
+            company   = str(row[3]).strip()
+            email     = str(row[7]).strip()
+            if not clean_reg:
                 update_transaction_status(clean_reg, 1, "Número de matrícula não encontrado na lista de funcionários")
-                return get_current_employee_data()  # Skip to next
+                return get_current_employee_data()
             elif not name:
                 update_transaction_status(clean_reg, 1, "Nome do funcionário não encontrado na lista de funcionários")
-                return get_current_employee_data()  # Skip to next
+                return get_current_employee_data()
             elif not company:
                 update_transaction_status(clean_reg, 1, "Número de empresa não encontrada na lista de funcionários")
-                return get_current_employee_data()  # Skip to next
+                return get_current_employee_data()
             def to_senior_fmt(d):
                 if isinstance(d, (datetime.date, datetime.datetime)):
                     return d.strftime("%d%m%Y")
@@ -117,13 +126,17 @@ def get_current_employee_data():
                 if len(clean) == 8:
                     return f"{clean[6:8]}{clean[4:6]}{clean[0:4]}"
                 return clean
+            pkg_parts = str(row[3]).strip().split('_')   # package = "2026_04"
             data = {
+                "id_lines": id_lines,
                 "registration": clean_reg,
                 "name": name,
                 "company": company,
                 "package": str(row[3]).strip(),
                 "start_date": to_senior_fmt(row[4]),
                 "end_date": to_senior_fmt(row[5]),
+                "month": pkg_parts[1] if len(pkg_parts) > 1 else "",
+                "year":  pkg_parts[0] if len(pkg_parts) > 0 else "",
                 "email": email,
                 "found": True
             }
@@ -159,16 +172,15 @@ def encrypt_downloaded_pdf(pdf_path, password):
 def generate_dynamic_filename(employee_name, package):
     timestamp = datetime.datetime.now().strftime("%H%M%S")
     return f"Voith_FolhaPonto_{employee_name.replace(' ', '_')}_{package}_{timestamp}"
-def update_transaction_status(registration, status, message):
+def update_transaction_status(id_lines, status, message):
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         now = datetime.datetime.now()
-        clean_reg = str(registration).split('.')[0].strip()
         cursor.execute(
-            "UPDATE tb_RPA0009 SET Status = ?, Log_Message = ?, Matching_Date = ? WHERE Registration = ? AND Status = 0",
-            (status, message, now, clean_reg))
+            "UPDATE tb_RPA0009 SET Status = ?, Log_Message = ?, Matching_Date = ? WHERE ID_Lines = ?",
+            (status, message, now, id_lines))
         conn.commit()
     finally:
         if conn: conn.close()
@@ -181,7 +193,7 @@ def generate_process_log():
         package = f"{today.year}_{today.month:02d}"
         cursor.execute("SELECT Value FROM tb_ProcessConfig WHERE Name = 'FilePath' AND ID_Process = 'RPA'")
         fp_row = cursor.fetchone()
-        file_path = str(fp_row[0]).strip() if fp_row else r"C:\TEMP\RPA\RPA0009"
+        file_path = str(fp_row[0]).strip() if fp_row else r"C:\TEMP\RPA0009"
         cursor.execute("SELECT Value FROM tb_ProcessConfig WHERE Name = 'FileLog' AND ID_Process = 'RPA'")
         fl_row = cursor.fetchone()
         file_log = str(fl_row[0]).strip() if fl_row else "LogEventosSenior.csv"

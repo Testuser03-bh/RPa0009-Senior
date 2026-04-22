@@ -25,7 +25,7 @@ class Initialization:
             
             if config:
                 # To-Do: Get the Process ID Code from Robot Framework variable
-                config.ProcessIDCode = "RPA0035"    #Define the Process ID Code here
+                config.ProcessIDCode = "RPA0009"    #Define the Process ID Code here
 
                 # Get all settings from the database            
                 init_settings = InitAllSettingsSQL()
