@@ -4,6 +4,6 @@ Library     adapter/Library/RobotProcessLibrary.py
 
 *** Tasks ***
 Senior Main Task
-    # Initialize Robot Process
+    Initialize Robot Process
     Senior employee timesheet data flow
-    # End Robot Process
+    End Robot Process

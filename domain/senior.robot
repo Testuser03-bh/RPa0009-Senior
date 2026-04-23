@@ -60,12 +60,10 @@ Validate Employee Data
         ${emp}=    Get Current Employee Data
         ${error_flag}=    Evaluate    $emp.get('error', '')
         IF    '${error_flag}' == 'csv_missing'
-            Log to console   EMAIL PART COMMENTED UNCOMMENT
-            # Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${responsible_list}    subject=${primary_config['Email_Subject_Error_01']}    body=${primary_config['Email_Body_Error_01']}
+            Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${responsible_list}    subject=${primary_config['Email_Subject_Error_01']}    body=${primary_config['Email_Body_Error_01']}
             BREAK
         ELSE IF    '${error_flag}' == 'already_processed'
-            Log to console   EMAIL PART COMMENTED UNCOMMENT RN
-            # Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${responsible_list}    subject=${primary_config['Email_Subject_Error_01']}    body=${primary_config['Email_Body_Error_04']}
+            Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${responsible_list}    subject=${primary_config['Email_Subject_Error_01']}    body=${primary_config['Email_Body_Error_04']}
             BREAK
         END
         IF    ${emp['found']} == False
@@ -125,21 +123,26 @@ Validate Employee Data
             Log To Console    WARNING: PDF encryption failed, continuing...
         END
 
-        # ${is_voith}=    Evaluate    "${emp['email']}".lower().endswith("@voith.com")
-        # ${active_smtp}=    Set Variable If    ${is_voith}    ${secondary_config['SMTP_Server']}    ${secondary_config['SMTP_Server_Out']}
-        # Authorize SMTP    account=${primary_config['Email_SenderAddress']}    password=${EMPTY}    smtp_server=${active_smtp}    smtp_port=${secondary_config['SMTP_Port']}
-        # ${email_body}=    Get File    ../data/body.html
-        # ${email_status}=    Run Keyword And Return Status    Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${emp['email']}    subject=Ponto ${emp['month']}/${emp['year']}    body=${email_body}    html=True    attachments=${full_pdf_path}
-        # IF    ${email_status}
-        #     Update Transaction Status    ${emp['id_lines']}    2    E-mail enviado com sucesso
-        #     ${final_folder}=    Set Variable    ${primary_config['FilePath']}\\${emp['package']}
-        #     Copy File    ${full_pdf_path}    ${final_folder}\\${pdf_filename}.pdf
-        #     Remove File  ${full_pdf_path}
-        #     Log To Console    File copied and removed from temp.
-        # ELSE
-        #     Update Transaction Status    ${emp['id_lines']}    1    Error to send e-mail
-        # END
-        Log to console  EMAIL PART COMMENTED UNCOMMENT
+        ${is_voith}=    Evaluate    "${emp['email']}".lower().endswith("@voith.com")
+        ${active_smtp}=    Set Variable If    ${is_voith}    ${secondary_config['SMTP_Server']}    ${secondary_config['SMTP_Server_Out']}
+        Authorize SMTP    account=${primary_config['Email_SenderAddress']}    password=${EMPTY}    smtp_server=${active_smtp}    smtp_port=${secondary_config['SMTP_Port']}
+        ${email_body}=    Get File    ${CURDIR}${/}..${/}data${/}body.html
+        ${email_status}=    Run Keyword And Return Status    Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${emp['email']}    subject=Ponto ${emp['month']}/${emp['year']}    body=${email_body}    html=True    attachments=${full_pdf_path}
+        IF    ${email_status}
+            Update Transaction Status    ${emp['id_lines']}    2    E-mail enviado com sucesso
+            Evaluate    __import__('dotenv').load_dotenv(".env")
+            ${ENV}=    Get Environment Variable    ENV
+            IF    '${ENV}' == 'UAT'
+                ${final_folder}=    Set Variable    ${primary_config['Path_Temp']}\\${emp['package']}
+            ELSE
+                ${final_folder}=    Set Variable    ${primary_config['FilePath']}\\${emp['package']}
+            END
+            Copy File    ${full_pdf_path}    ${final_folder}\\${pdf_filename}.pdf
+            Remove File  ${full_pdf_path}
+            Log To Console    File copied and removed from temp.
+        ELSE
+            Update Transaction Status    ${emp['id_lines']}    1    Error to send e-mail
+        END
         Wait For Element    ${close_pdf}    timeout=10
         Click    ${close_pdf}
         Log To Console    Moving to next employee...
@@ -170,13 +173,11 @@ Send Email Final Report
     ${test_recipients}=    Split String    ${primary_config['Email_Responsible_Test']}    ;
     Authorize SMTP    account=${primary_config['Email_SenderAddress']}    password=${EMPTY}    smtp_server=${secondary_config['SMTP_Server']}    smtp_port=${secondary_config['SMTP_Port']}
     TRY
-        # Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${test_recipients}    subject=${email_subject}    body=${body_msg}    html=True    attachments=${log_path}
+        Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${test_recipients}    subject=${email_subject}    body=${body_msg}    html=True    attachments=${log_path}
         Log To Console    Report successfully sent with attached log!
-        Log to console  EMAIL PART COMMENTED UNCOMMENT
     EXCEPT    AS    ${err_msg}
         Log To Console    Failed to send final report. Sending fallback error email.
-        Log to console  EMAIL PART COMMENTED UNCOMMENT
-        # Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${test_recipients}    subject=${primary_config['Email_Subject_Error_02']} - RPA0009    body=${primary_config['Email_Body_Error_03']}<p>${err_msg}</p>    html=True
+        Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${test_recipients}    subject=${primary_config['Email_Subject_Error_02']} - RPA0009    body=${primary_config['Email_Body_Error_03']}<p>${err_msg}</p>    html=True
     END
 
 Clean up
