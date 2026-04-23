@@ -1,6 +1,7 @@
 import datetime
 import PyPDF2
 import os
+from pendulum import today
 import pyodbc
 import shutil
 import csv
@@ -69,10 +70,10 @@ def get_current_employee_data():
                 
                 if lines:
                     # Step 2.2.1.1.2: Date transformation
-                    first_line = lines[0].strip().split(';')
-                    month_num = int(first_line[0])
-                    year_num = int(first_line[1])
-                    package = f"{year_num}_{month_num:02d}"
+                    today     = datetime.datetime.now()
+                    month_num = today.month
+                    year_num  = today.year
+                    package   = f"{year_num}_{month_num:02d}"
                     initial_year = year_num - 1 if month_num == 1 else year_num
                     
                     # Step 2.2.1.1.3: Check if package already processed
@@ -102,8 +103,8 @@ def get_current_employee_data():
                         day_end, month_end = "25", f"{month_num:02d}"
                     
                     # Step 2.2.1.1.3.1.2.1-2: Format dates for SQL
-                    db_start_date = f"{initial_year}-{month_start}-{day_start}"
-                    db_end_date   = f"{year_num}-{month_end}-{day_end}"
+                    db_start_date = f"{day_start}-{month_start}-{initial_year}"
+                    db_end_date   = f"{day_end}-{month_end}-{year_num}"
                     logger.console(f"[DB HELPER] Formatted SQL Dates - Start: {db_start_date}, End: {db_end_date}")
                     
                     # Step 2.2.1.1.3.1.1.1: Create package folder
