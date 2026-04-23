@@ -34,7 +34,7 @@ Open Senior Application
     Move Mouse    ${senior}
     Click    ${senior}
 Login Senior
-    Wait For Element    ${user}    timeout=10
+    Wait For Element    ${user}    timeout=20
     Click    ${user}
     ${user}=        Evaluate        "${primary_config['Senior_User']}".split("_")[0].strip()
     RPA.Desktop.Type Text         ${user}
@@ -119,11 +119,16 @@ Validate Employee Data
         Click    ${save_button_blue}
         ${temp_path}=        Set Variable    ${primary_config['Path_Temp']}
         ${full_pdf_path}=    Set Variable    ${temp_path}\\${pdf_filename}.pdf
-        Encrypt Downloaded Pdf    ${full_pdf_path}    ${emp['registration']}
-        ${is_voith}=    Evaluate    "${emp['email']}".lower().endswith("@voith.com")
-        ${active_smtp}=    Set Variable If    ${is_voith}    ${secondary_config['SMTP_Server']}    ${secondary_config['SMTP_Server_Out']}
-        Authorize SMTP    account=${primary_config['Email_SenderAddress']}    password=${EMPTY}    smtp_server=${active_smtp}    smtp_port=${secondary_config['SMTP_Port']}
-        ${email_body}=    Get File    ../data/body.html
+        
+        ${encrypt_result}=    Encrypt Downloaded Pdf    ${full_pdf_path}    ${emp['registration']}
+        IF    not ${encrypt_result}
+            Log To Console    WARNING: PDF encryption failed, continuing...
+        END
+
+        # ${is_voith}=    Evaluate    "${emp['email']}".lower().endswith("@voith.com")
+        # ${active_smtp}=    Set Variable If    ${is_voith}    ${secondary_config['SMTP_Server']}    ${secondary_config['SMTP_Server_Out']}
+        # Authorize SMTP    account=${primary_config['Email_SenderAddress']}    password=${EMPTY}    smtp_server=${active_smtp}    smtp_port=${secondary_config['SMTP_Port']}
+        # ${email_body}=    Get File    ../data/body.html
         # ${email_status}=    Run Keyword And Return Status    Send Message    sender=${primary_config['Email_SenderAddress']}    recipients=${emp['email']}    subject=Ponto ${emp['month']}/${emp['year']}    body=${email_body}    html=True    attachments=${full_pdf_path}
         # IF    ${email_status}
         #     Update Transaction Status    ${emp['id_lines']}    2    E-mail enviado com sucesso
